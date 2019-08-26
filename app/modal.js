@@ -1,84 +1,87 @@
 $(document).ready(function () {
-  console.log('Modal ');
-  
+
   app.initialized()
     .then(
       function (_client) {
-        console.log('app initialized');
-        
-      window.client = _client;
-      client.instance.context().then(
-        function(context)  {
-          console.log("Modal instance API context", context.data.id);
-          onLoadOperations(context.data);
-          /* Output: Modal instance API context { instanceId: "4",   location: "modal", parentId: "1", modalData: {name: "James", email: "James@freshdesk.com"} }" */
-        }
-      );
-        
-    });
 
-    function onLoadOperations(ticket){
-      let  ticketID = ticket.id
-      console.log('Ticket',ticket);
-      
-      getIssues().then(function(data){
-        console.log('data',data);
-        console.log('search',search(ticketID,data.issues));
-        
-        issueID = search(ticketID,data.issues);
-
-        console.log('issueID',issueID);
-        fetchIssue(issueID);
-        
-      })
+        window.client = _client;
+        client.instance.context().then(
+          function (context) {
+            onModalLoad(context.data);
+          },
+          function (error){
+            console.error('error',error);
+          }
+        );
+      });
 
 
-    }
+  /**
+   * Function that is triggered on Modal load.
+   * @param {object} ticket  ticket that is fetched from parent 
+   */
+  function onModalLoad(ticket) {
+    let ticketID = ticket.id
+    getIssues().then(function (data) {
+      issueID = search(ticketID, data.issues);
+      fetchIssue(issueID);
 
-      function getIssues() {
-        let results = client.db.get('issues').then(function (data) {
-                return data;
-            }).catch(function (error) {
-            })
-        return results;
-    }
-
-
-    function fetchIssue(issueID) {
-      console.log('inside FEtchIssue');
-      let html = ''
-      headers = {
-          Authorization: 'token <%= access_token %>',
-          'User-Agent': 'Sample'
-      };
-      options = { headers: headers, isOAuth: true };
-      
-      client.request.get(`https://api.github.com/repos/velmurugan-balasubramanian/Weather-Buddy/issues/${issueID}`, options).then(function (data) {
-          data = JSON.parse(data.response);
-          console.log('data of one issue', data);
-
-            html = `<h3> Issue title : ${data.title} </h3><p>Description : ${data.body}</p> <p> Issue Number : ${data.number}</p> <p>Issue ID ; ${data.id}</p><p> Issue Status : ${data.state}</p>`
-
-            $('#modal').append(html);
-
-      }).catch(function (error) {
-          console.log("error", error);
-
-      })
+    })
   }
 
+  /**
+   * Helper function get issues from data storage
+   */
+  function getIssues() {
+    let results = client.db.get('issues').then(function (data) {
+      return data;
+    }).catch(function (error) {
+      console.error('error', error);
+    })
+    return results;
+  }
+
+
+
+  /**
+   * Function to fecth issue from github, authorization is done using Oauth
+   * @param {string} issueID  Issue number to query specific  ticket from github
+   */
+  function fetchIssue(issueID) {
+
+    let headers = {
+      Authorization: 'token <%= access_token %>',
+      'User-Agent': 'Sample'
+    };
+    let options = { headers: headers, isOAuth: true };
+
+    client.request.get(`https://api.github.com/repos/velmurugan-balasubramanian/Weather-Buddy/issues/${issueID}`, options).then(function (data) {
+      data = JSON.parse(data.response);
+      let html = ''
+      html = `<h3> Issue title : ${data.title} </h3><p>Description : ${data.body}</p> <p> Issue Number : ${data.number}</p> <p>Issue ID ; ${data.id}</p><p> Issue Status : ${data.state}</p>`
+
+      $('#modal').append(html);
+
+    }).catch(function (error) {
+      console.error("error", error);
+
+    })
+  }
+
+
+
+  /**
+   * Helper function to search and return issue number for current ticket and corresponding issue 
+   * @param {*} searchKey           Key to be searched
+   * @param {*} arrayToBeSearched   Array to be searched for the key
+   */
   function search(searchKey, arrayToBeSearched) {
-  
+
     for (var i = 0; i < arrayToBeSearched.length; i++) {
-        if (arrayToBeSearched[i].ticketID == searchKey) {
-          console.log('arrayToBeSearched[i].ticketID',arrayToBeSearched[i].ticketID);
-          console.log('arrayToBeSearched[i].issueId',arrayToBeSearched[i].issueNumber);
-          
-          issueID = arrayToBeSearched[i].issueNumber;
-          console.log('issueId',issueID);
-          
-            return issueID;
-        }
+      if (arrayToBeSearched[i].ticketID == searchKey) {
+        let issueNumber = arrayToBeSearched[i].issueNumber;
+        return issueNumber;
+      }
     }
-}
+  }
 });

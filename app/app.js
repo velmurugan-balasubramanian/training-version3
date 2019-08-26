@@ -6,20 +6,31 @@ $(document).ready(function () {
                 function () {
                     clickEventHandler();
                 });
+        },
+        function(error){
+            console.error('Error'+ error); 
         });
 
+
+    /**
+     * Function that triggered on app load, with all event handlers
+     */
     function clickEventHandler(){
         $('#createIssue').click(function () {
-            getTicketDetails();
+            createIssue();
         });
 
         $('#viewIssue').click(function () {
-            openModal();
+            viewIssue();
         });
     }
 
-    function getTicketDetails() {
-        client.data.get('ticket')
+
+    /**
+     *  Function to crate a Github Issue
+     */
+    function createIssue() {
+        getTicketDetails()
             .then(function (data) {
                 let ticket = data.ticket;
 
@@ -29,40 +40,62 @@ $(document).ready(function () {
                     let issues = data.issues;
                     if (search(ticketID, issues) == false) {
 
-                        CreateIssue(ticket, issues);
+                        CreateIssueHelper(ticket, issues);
                     }
                     else {
                         showNotification('danger', 'Warning', 'Github issue for this ticket has already been created');
                     }
 
                 }).catch(function (error) {
-
                     console.error(error);
-                    
                 })
-
             })
             .catch(function (error) {
                 console.error(error);
             });
     }
 
-    function CreateIssue(ticket, issues) {
 
-        headers = {
+    /**
+     *  Function to View issue in the modal, Passes ticket as an object to the modal, can be fetched in the modal using instance api
+     */
+    function viewIssue() {
+
+        getTicketDetails().then(function (data) {
+
+            client.interface.trigger("showModal", {
+                title: "Information Form",
+                template: "modal.html",
+                data: data.ticket
+            });
+        },
+        function(error){
+            console.error('Error'+error);
+            
+        })
+    }
+
+
+    /**
+     * Helper Function to create issue in Github
+     * @param {*} ticket // Ticket Object 
+     * @param {*} issues // Issyues Array
+     */
+    function CreateIssueHelper(ticket, issues) {
+
+        let headers = {
             Authorization: 'token <%= access_token %>',
             'User-Agent': 'Sample'
         };
-        body = JSON.stringify({
+        let body = JSON.stringify({
             "title": `${ticket.subject}`,
             "body": `${ticket.description_text}`
         });
-        options = { headers: headers, isOAuth: true, body: body };
+        let options = { headers: headers, isOAuth: true, body: body };
         client.request.post(`https://api.github.com/repos/velmurugan-balasubramanian/Weather-Buddy/issues`, options).then(function (data) {
-            data = JSON.parse(data.response);
-    
-        
-            let obj = { ticketID: ticket.id, issueId: data.id, issueNumber:data.number };
+            let response = data;
+            response = JSON.parse(data.response);
+            let obj = { ticketID: ticket.id, issueId: response.id, issueNumber: response.number };
             issues.push(obj)
             setData(issues)
 
@@ -72,6 +105,26 @@ $(document).ready(function () {
         })
     }
 
+
+    /**
+     *  Helper Function to Fetch the current ticket details 
+     */
+    function getTicketDetails(){
+        
+      let ticket =  client.data.get('ticket').then(
+        function(data){
+            return data;
+        })
+        .catch(function(error){
+            return error;
+        })
+        return ticket;
+    }
+
+
+    /**
+     *  Helper function to fetch issue object from data storage
+     */
     function getIssues() {
         let results =
             client.db.get('issues').then(function (data) {
@@ -86,21 +139,29 @@ $(document).ready(function () {
     }
 
 
-
+    /**
+     * Helper function to setdate in data storage
+     * @param {array} data  Issue array to be set in data storage
+     */
     function setData(data) {
 
         client.db.set("issues", { issues: data })
-            .then(function (data) {
-                console.log("DAta Save", data);
-                showNotification('success', 'success', 'Data Saved Successfully')
+            .then(function () {
+                
+                showNotification('success', 'success', 'Issue Created successfully')
             })
             .catch(function (error_data) {
-                console.log(error_data);
+                console.error(error_data);
             });
 
     }
 
 
+    /**
+     * 
+     * @param {string} searchKey            // key to be sarched in array
+     * @param {array} arrayToBeSearched     // Array in which the key to be set
+     */
     function search(searchKey, arrayToBeSearched) {
         let flag = false
         for (var i = 0; i < arrayToBeSearched.length; i++) {
@@ -108,60 +169,16 @@ $(document).ready(function () {
                 flag = true;
             }
         }
-        console.log("flag", flag);
-
         return flag;
     }
 
 
-    function openModal() {
-
-        client.data.get('ticket').then(function (data) {
-
-            client.interface.trigger("showModal", {
-                title: "Information Form",
-                template: "modal.html",
-                data: data.ticket
-            });
-        })
-
-
-    }
-
-
-
-    function displayButton() {
-        client.db.get('issues').then(function (data) {
-            let storeddataArray = data.issues;
-            console.log('blahbkah');
-
-            client.data.get('ticket').then(function (data) {
-                console.log("data", data);
-                if (search(data.id, storeddataArray) == false) {
-                    console.log('data.ticket.id', data.ticket.id);
-                    console.log('storeddataArray', storeddataArray);
-
-
-                    console.log('inside if');
-
-                    $('#html').append(`<button id="createIssue">Create Issue</button>`)
-                }
-                else {
-                    console.log(' inside else');
-
-                    $('#html').append(`<button id="createIssue">View Issue Details</button>`);
-                }
-
-            })
-
-
-        }).catch(function (error) {
-            if (error.status == 404) {
-                $('#html').append(`<button id="createIssue">View Issue Details</button>`);
-            }
-        })
-
-    }
+    /**
+     * Function to show notification to the user in the front end
+     * @param {string} type     Type of error message 
+     * @param {string} title    Title of the message
+     * @param {string} message  Notification message
+     */
 
     function showNotification(type, title, message) {
         client.interface.trigger("showNotify", {
@@ -169,21 +186,12 @@ $(document).ready(function () {
             title: `${title}`,
             message: `${message}`
         }).then(function (data) {
-            console.log('succes', data);
+            console.info('succes', data);
 
         }).catch(function (error) {
-            console.log('error', error);
+            console.error('error', error);
         });
     }
-	function deleteDB() {
-		client.db.delete("issues").then(
-			function (data) {
-				console.log("success"+JSON.stringify(data));
-			})
-			.catch(function (error) {
-				console.log("error" + JSON.stringify(error));
-			})
-	}
 
 
 });
